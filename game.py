@@ -1,9 +1,22 @@
 from sys import exit
 import random
+
 class Item:
     def __init__(self, name, function):
         self.name = name
         self.function = function
+
+class Room(object):
+
+    def __init__(self, name, monsters, loots, events):
+        self.name = name
+        if monsters == None:
+            self.monsters = []
+        if chests == None:
+            self.chests = []
+        if events == None:
+            self.events = []
+
 
 class Character:
 
