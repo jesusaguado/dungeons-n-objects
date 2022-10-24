@@ -5,9 +5,10 @@ classes in Python.
 
 ## Usage
 
-Clone the repo and simply run it with Python (tested on Python 3.10).
+Clone the repo and simply run it with Python (tested on Python 3.10),
+
+`python game.py`
 
 ## License
 
 GPLv3
-# dungeons-n-objects
