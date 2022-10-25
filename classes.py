@@ -2,6 +2,7 @@ from sys import exit
 import random
 import sys,time,random
 import os
+from script import *
 
 ##############################################################
 # GAME SETTINGS
@@ -9,7 +10,7 @@ import os
 
 TOTAL_POINTS = 20 # total points to invets in hp+atk+df
 TYPING_SPEED = 300 # writing speed
-FAST_SPEED = 1000
+FAST_SPEED = 2000
 yeses = ["yes", "YES", "Y", "y", "ok"]
 noes = ["no", "NO", "n", "N"]
 
@@ -28,6 +29,9 @@ def fast_type(t):
         time.sleep(random.random()*10.0/FAST_SPEED)
     print('')
 
+def pinput():
+    return input("\n> ")
+
 def slow_type(t):
     for l in t:
         sys.stdout.write(l)
@@ -35,22 +39,45 @@ def slow_type(t):
         time.sleep(random.random()*10.0/TYPING_SPEED)
     print('')
 
+# deprecated bc it's ugly to have the prompt everywhere
 def gpause():
     input("> ")
     cls()
 
 def spause():
     input(">")
+
+def npause():
+    input()
     
+def Npause():
+    input()
+    cls()
 
 
 ##############################################################
 # OBJECTS AND CLASSES
 ##############################################################
+class Event:
+    def __init__(self, name, event_type, event_function, event_items = None):
+        self.name = name
+        self.event_type = event_type
+        # types: -1: after combat, 0: in room
+        self.event_function = event_function
+        if event_items == None:
+            event_items = []
+
+    def attach_items(self, item):
+        self.event_items.append(item)
+
+    def trigger(self):
+        self.event_function()
+        
+
 
 class Character:
 
-    def __init__(self, name, hp, atk, df, status, items = None):
+    def __init__(self, name, hp, atk, df, status, items = None, events = None):
 
         self.name = name
         self.hp = hp
@@ -58,6 +85,8 @@ class Character:
         self.df = df
         self.status = status
 
+        if events == None:
+            self.events = []
         if items == None:
             self.items = []
 
@@ -66,8 +95,19 @@ class Character:
         if final_health <= 0:
             self.status = 0
         self.hp = final_health
+
     def give_item(self, item):
         self.items.append(item)
+
+    def attach_event(self, event):
+        self.events.append(event)
+
+    def trigger_post_event(self):
+        for event in self.events:
+            if event.event_type == -2:
+                event.trigger()
+            if event.event_type == -1:
+                event.trigger()
 
 class Item:
     def __init__(self, name, function):
@@ -94,24 +134,55 @@ class Chest(object):
         self.trigger_event = trigger_event
         self.lock = lock
 
+def loot_corpse(winner, loser):
+    if loser.items != []:
+        for item in loser.items:
+            slow_type("(!) {} obtains {} from {}!".format(winner.name, item.name, loser.name))
+            winner.give_item(item)
+            npause()
+        loser.items = []
+
+
 ##############################################################
 # GAME STRUCTURE FUNCTION
 ##############################################################
+def intro():
+    cls()
+    fast_type(ea)
+    slow_type(spaces+"PRESENTS")
+    gpause()
+    
+    fast_type(title)
+    fast_type(middle)
+    fast_type(tittle2)
+    gpause()
+
 
 def start_game():
     cls()
     global player
-    slow_type("Insert name:")
-    name = str(input("> "))
+    name = ""
+    while len(name) == 0:
+        slow_type("Insert name:")
+        name = str(input("> "))
+        if len(name) == 0:
+            slow_type("Enter a non-empty name!")
+            cls()
     creating = True
     while creating:
         slow_type("You can distribute up to {} points in HP (health points), ATK (attack) and DF (defense).".format(TOTAL_POINTS))
         slow_type("How many points in HP?")
-        hp = int(input("> "))
+        hp = input("> ")
         slow_type("How many points in ATK?")
-        atk = int(input("> "))
+        atk = input("> ")
         slow_type("How many points in DF?")
-        df = int(input("> "))
+        df = input("> ")
+        if hp.isdigit() and atk.isdigit() and df.isdigit():
+            hp, atk, df = int(hp), int(atk), int(df)
+        else:
+            slow_type("Enter only positive integers! Try again...")
+            Npause()
+            continue
         if hp >=1 and atk >= 1 and df >= 1 and hp+atk+df <= TOTAL_POINTS:
             creating = False
             player = Character(name, hp, atk, df, 1, None)
@@ -119,12 +190,24 @@ def start_game():
             break
         else:
             slow_type("This is not a valid distribution. Put at least 1 point in each characteristic and do not exceed {} in total.".format(TOTAL_POINTS))
+            Npause()
     return player
 
 
+def end_game():
+    cls()
+    print(end)
+    slow_type(spaces+"Play again? (y/n)")
+    choice = input("> ")
+    if choice in yeses:
+        start_game()
+    else:
+        exit()
 
 def game_over():
-    slow_type("You lost. Want to play again? (y/n)")
+    cls()
+    print(gameovertext)
+    slow_type(spaces + "Play again? (y/n)")
     choice = input("> ")
     if choice in yeses:
         start_game()
@@ -158,24 +241,48 @@ def calculate_damage(attackant, defendant):
     return max(rng - df,0)
 
 def choose_item(player):
+    """
+    In combat, let player select or choose items from a list.
+
+    Outputs:
+        0: if there are no items
+        -1: if item selection is cancelled
+    """
     items = player.items
     confirmed = False
+    if items == []:
+        # if there are no items, cancel
+        print("{} has no items!".format(player.name))
+        npause()
+        return 0
+        exit
+        
     while not confirmed:
-        slow_type("{} has these items".format(player.name))
+        slow_type("Enter number to select.")
         N = len(player.items)
         for j in range(0, N):
             print(j+1,')',items[j].name)
-        slow_type("Which item to use? (Enter number)")
+        print(N+1,') Cancel')
         try:
             choice = int(input("> "))
         except:
             slow_type("Enter a number!")
             continue
-        slow_type("Use {}? (y/n)".format(items[choice-1].name))
-        confirmation = input("> ")
-        if confirmation in ["yes", "YES", "y", "Y"]:
-            confirmed = True
-            return items[choice-1]
+        if choice <= N and choice >= 1:
+            slow_type("Use {}? (y/n)".format(items[choice-1].name))
+            confirmation = input("> ")
+            if confirmation in ["yes", "YES", "y", "Y"]:
+                confirmed = True
+                return items[choice-1]
+            else:
+                print("Cancelling item selection")
+                choice = N+1
+                npause()
+                return -1
+        elif choice == N+1:
+            print("Cancelled item selection...")
+            npause()
+            return -1
         else:
             continue
 
@@ -188,62 +295,99 @@ def check_dead(character):
 # COMBAT
 ##############################################################
 
+def combat_header(player, foe):
+    print("")
+    print("     COMBAT AGAINST {}!".format(foe.name.upper()))
+    print("________________________________________________________________________")
+    print("{} HP: {}         vs   {} HP: {}".format(player.name.upper(), player.hp, foe.name.upper(), foe.hp))
+    print("________________________________________________________________________")
 
+def attack(player, foe):
+    damage = calculate_damage(player, foe)
+    foe.modify_hp(-damage)
+    slow_type("{} attacks {} and deals {} points of damage!".format(player.name, foe.name, damage))
+
+def use_item(player, foe, item):
+    #if item == 0:
+    #    # no items
+    #elif item == -1:
+    #    # cancelled item selection
+    if True:
+        item.function(player, foe)
+        print("{} used {} on {}.".format(player.name, item.name, foe.name))
+        
 def initiate_combat(player, foe):
-    slow_type("{} encounters a {}".format(player.name, foe.name))
-    spause()
+    # Introduce the combat
+    slow_type("{} encounters a {}!".format(player.name, foe.name))
+    npause()
+
     both_alive = player.status and foe.status
     if not both_alive:
         slow_type("ERROR: some of the combatants is already DEAD!")
         exit()
+    # main combat loop
     while both_alive:
+        # clean screen and give the combat header
         cls()
-        print("")
-        print("     COMBAT AGAINST {}!".format(foe.name.upper()))
-        print("________________________________________________________________________")
-        print("{} HP: {}         vs   {} HP: {}".format(player.name.upper(), player.hp, foe.name.upper(), foe.hp))
-        print("________________________________________________________________________")
+        combat_header(player, foe)
+        # Give the combat options
         slow_type("What should {} do? (attack/item/run)".format(player.name))
         choice = input("> ")
+
+        # execute combat options
         if choice == "item":
             item = choose_item(player)
-            item.function(player, foe)
-            if check_dead(foe):
-                slow_type("{} wins!".format(player.name))
-                gpause()
-                break
+            if item == 0: # there are no items!
+                continue
+            elif item == -1: # item selection was cancelled...
+                continue
+            else:
+                use_item(player, foe, item)
+                if check_dead(foe):
+                    slow_type("{} wins!".format(player.name))
+                    Npause()
+                    return 1
 
         elif choice == "attack":
-            damage = calculate_damage(player, foe)
-            foe.modify_hp(-damage)
-            slow_type("{} attacks {} and deals {} points of damage!".format(player.name, foe.name, damage))
+            attack(player, foe)
             if check_dead(foe):
                 slow_type("{} wins!".format(player.name))
-                gpause()
-                break
+                Npause()
+                return 1
+
         elif choice == "run":
             slow_type("{} played chicken and fleed from combat!".format(player.name))
             print("DEBUG: implement fleeing consequences!")
-            break
+            return 2
+
+        # easter egg
         elif "sing" in choice:
             slow_type("{} sings {} the song of his people!".format(player.name, foe.name))
             slow_type("{} is now friends with {}. No need to combat anymore!".format(player.name, foe.name))
             spause()
-            break
+            return 2
+
+        # not valid user input for combat option
         else:
             slow_type("This is not a valid option.")
+            spause()
             continue
-        spause()
+        # pause before foe's turn begins
+        npause()
         # the foe attacks if it is alive and the combat proceed
-        damage = calculate_damage(foe, player)
-        slow_type("{} attacks {} and deals {} points of damage!".format(foe.name, player.name, damage))
-        player.modify_hp(-damage)
+        attack(foe, player)
         if player.status == 0:
             print("{} has been defeated by {}.".format(player.name, foe.name))
             spause()
             game_over()
+
         both_alive = foe.status and player.status
-        gpause()
+        # clean pause and clear screen
+        Npause()
         # down here we should implement exit procedure!
 
-
+def post_combat(player, foe, result):
+    if result == 1:
+        loot_corpse(player, foe)
+        if foe.events != []:
+            foe.trigger_post_event() 
