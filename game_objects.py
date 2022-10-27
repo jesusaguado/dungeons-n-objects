@@ -1,13 +1,13 @@
 from classes import *
 from game_events import *
-
+import random
 
 ##################################################
 # MONSTERS 
 ##################################################
 bobby = Character("Bobby", 10, 3, 2, 1, None)
 
-goblin = Character("Goblin", 5, 2, 1, 1, None)
+knight = Character("Forgotten Knight", 2, 4, 1, 1, None)
 
 cthulhu = Character("Cthulhu Lord of Darkness", 40, 15, 10, 1, None)
 cthulhu.attach_event(event_end_game)
@@ -51,5 +51,14 @@ laser_gun = Item("Laser Gun", laser_gun_fun, "combat", -1, "A laser gun that ins
 
 #bobby.give_item(laser_gun, True)
 #bobby.give_item(potion, True)
-goblin.give_item(sword, True)
+knight.give_item(sword, True)
 bobby.give_item(potions.pop(), True)
+
+goblins = []
+for i in range(0,30):
+    hp_goblin = random.randint(2,8)
+    atk_goblin = random.randint(1,4)
+    goblin = Character("Goblin", hp_goblin, atk_goblin, 1, 1, None)
+    if atk_goblin % 3 == 0:
+        goblin.give_item(potions.pop(), True)
+    goblins.append(goblin)
