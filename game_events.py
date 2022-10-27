@@ -1,5 +1,5 @@
 from classes import *
-from script import *
+from game_text import *
 from sys import exit
 import random
 

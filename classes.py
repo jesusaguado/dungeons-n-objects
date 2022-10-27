@@ -1,8 +1,8 @@
 from sys import exit
 import random
+from resources import *
 import sys,time,random
 import os
-from script import *
 
 ##############################################################
 # GAME SETTINGS
@@ -80,6 +80,7 @@ class Character:
     def __init__(self, name, hp, atk, df, status, items = None, events = None):
 
         self.name = name
+        self.max_hp = hp
         self.hp = hp
         self.atk = atk
         self.df = df
@@ -90,14 +91,25 @@ class Character:
         if items == None:
             self.items = []
 
+    def print_status(self):
+         
+        print(bars)
+        print(f"Name: {self.name}")
+        print(f"HP: {self.hp} / {self.max_hp}")
+        print(f"ATK: {self.atk}")
+        print(f"DF: {self.df}")
+        print(bars)
+
     def modify_hp(self,delta):
         final_health = self.hp + delta
         if final_health <= 0:
             self.status = 0
         self.hp = final_health
 
-    def give_item(self, item):
+    def give_item(self, item, silent = False):
         self.items.append(item)
+        if not silent:
+            print("(!) {} obtains {}".format(self.name, item.name))
 
     def attach_event(self, event):
         self.events.append(event)
@@ -110,34 +122,113 @@ class Character:
                 event.trigger()
 
 class Item:
-    def __init__(self, name, function):
+    def __init__(self, name, function, description = ""):
         self.name = name
         self.function = function
+        self.description = description
+    
 
-class Room(object):
 
-    def __init__(self, name, monsters, chests, events, doors):
-        self.name = name
-        if monsters == None:
-            self.monsters = []
-        if chests == None:
-            self.chests = []
-        if events == None:
-            self.events = []
-        self.doors = doors
+
 
 class Chest(object):
-    def __init__(self, name, content, trigger_event, lock):
+    def __init__(self, name, content, trigger_event = None):
         self.name = name
         if content == None:
             self.content = []
+        else:
+            self.content = content
         self.trigger_event = trigger_event
-        self.lock = lock
+
+    def open_chest(self,player):
+        contents = self.content
+        if contents == []:
+            slow_type("Chest is empty...")
+            npause()
+        else:
+            for item in contents:
+                slow_type("There is something in here!")
+                player.give_item(item, False)
+                npause()
+        self.content = []
+################################################# #
+# NAVIGATION
+################################################# #
+class Map(object):
+
+    def __init__(self, list_of_rooms, adjacency_matrix, initial_room):
+        self.rooms = list_of_rooms
+        self.adjacency_matrix = adjacency_matrix
+        self.initial_room = initial_room
+
+class Room(object):
+
+    def __init__(self, name, description, monsters, chests, events):
+        self.name = name
+        self.description = description
+        if monsters == None:
+            self.monsters = []
+        else:
+            self.monsters = monsters
+        if chests == None:
+            self.chests = []
+        else:
+            self.chests = chests
+        if events == None:
+            self.events = []
+        else:
+            self.events = events
+
+    def give_adjacent_rooms(self, Map):
+        i=Map.rooms.index(self)
+        adjacents = []
+        edges = Map.adjacency_matrix[i]
+        for j in range(0,len(edges)):
+            if edges[j] != 0:
+                adjacents.append(Map.rooms[j])
+        return adjacents
+
+    def enter_room(self,player, gamemap):
+        cls()
+        #slow_type("{} is in {}".format(player.name, self.name))
+        self.room_header()
+        monsters = self.monsters
+        random.shuffle(monsters)
+        while monsters != []:
+            monster = monsters.pop()
+            slow_type("{} is suddenly attack!".format(player.name))
+            result_last_combat = initiate_combat(player, monster)
+            post_combat(player, monster, result_last_combat)
+            self.monsters = monsters
+        slow_type(self.description)
+        npause()
+        exited = give_room_options(player, self, gamemap)
+        
+
+
+
+        return exited
+
+
+    def room_header(self):
+        print(bars)
+        print(spaces+"{}".format(self.name.upper()))
+        print(bars)
+    
+def header(string):
+    print(bars)
+    print(spaces+"{}".format(string.upper()))
+    print(bars)
+       
+################################################# #
+################################################# #
+
+
 
 def loot_corpse(winner, loser):
     if loser.items != []:
         for item in loser.items:
-            slow_type("(!) {} obtains {} from {}!".format(winner.name, item.name, loser.name))
+            slow_type("(!) {} obtains some items from {}!".format(winner.name, loser.name))
             winner.give_item(item)
             npause()
         loser.items = []
@@ -186,7 +277,8 @@ def start_game():
         if hp >=1 and atk >= 1 and df >= 1 and hp+atk+df <= TOTAL_POINTS:
             creating = False
             player = Character(name, hp, atk, df, 1, None)
-            print("Created {}!".format(player.name))
+            slow_type("Created {}!".format(player.name))
+            Npause()
             break
         else:
             slow_type("This is not a valid distribution. Put at least 1 point in each characteristic and do not exceed {} in total.".format(TOTAL_POINTS))
@@ -207,29 +299,76 @@ def end_game():
 def game_over():
     cls()
     print(gameovertext)
-    slow_type(spaces + "Play again? (y/n)")
-    choice = input("> ")
+    #slow_type(spaces + "Play again? (y/n)")
+    #choice = input("> ")
+    choice = "no"
     if choice in yeses:
         start_game()
     else:
         exit()
 
-def give_frame(player):
-    slow_type("Select option:")
-    slow_type("s: check status")
-    print("c: combat random oponent")
-    choice = input("> ")
+def give_room_options(player, room, gamemap):
+    """
+    This is an infinite while loop as long as the player is in
+    the room! It exits with the exit room.
+    """
+    options = ["check STATUS", "check ITEMS", "check ROOM", "MOVE", "LOOT", "HELP"]
 
-    if choice == "s":
-        print("==    STATUS   =====")
-        print(f"Name: {player.name}")
-        print(f"HP: {player.hp}")
-        print(f"ATK: {player.atk}")
-        print(f"DF: {player.df}")
-        print("====================")
-        give_frame(player)
-    elif choice == "c":
-        slow_type("Starting combat...")
+
+    exiting_room = False
+
+    while not exiting_room:
+        cls()
+        room.room_header()
+        for option in options:
+            print('-',option)
+        print("")
+        choice = input("> ")
+
+        if choice in ['status','STATUS']:
+            cls()
+            player.print_status()
+            npause()
+            
+        elif choice in ['item','items','ITEMS', 'ITEM']:
+            slow_type("Checking your backpack...")
+            npause()
+            cls()
+            header("items")
+            item = selector(player.items, "{} has no items!".format(player.name), False)
+            if item not in [0,-1]:
+                slow_type(item.name+': '+item.description)
+                npause()
+
+        elif choice in ['room', 'ROOM']:
+            slow_type(room.description)
+            npause()
+
+        elif choice in ['move','MOVE','door','DOOR','travel','TRAVEL']:
+            slow_type("You consider where to go from here...")
+            adjacents = room.give_adjacent_rooms(gamemap)
+            exit_room = selector(adjacents, "You cannot go anywhere from here!", False)
+            slow_type("Moving towards {}...".format(exit_room.name.format()))
+            npause()
+            if exit_room not in [0,-1]:
+                exiting_room = True
+
+        elif choice in ['loot','LOOT','chest','CHEST','chests','CHESTS']:
+            slow_type("You look around for anything of value...")
+            chest = selector(room.chests, "There is nothing to be found...") 
+            if chest not in [0,-1]:
+                chest.open_chest(player)
+
+        elif choice in ['help','HELP']:
+            slow_type('Help is yet to be implemented hehe')
+            npause()
+
+        else:
+            slow_type('You seem to be somewhat confused... Try again!')
+            npause()
+
+    return exit_room
+         
     
 
 def calculate_damage(attackant, defendant): 
@@ -240,51 +379,7 @@ def calculate_damage(attackant, defendant):
     rng = random.randint(atk_minus, atk_plus)
     return max(rng - df,0)
 
-def choose_item(player):
-    """
-    In combat, let player select or choose items from a list.
 
-    Outputs:
-        0: if there are no items
-        -1: if item selection is cancelled
-    """
-    items = player.items
-    confirmed = False
-    if items == []:
-        # if there are no items, cancel
-        print("{} has no items!".format(player.name))
-        npause()
-        return 0
-        exit
-        
-    while not confirmed:
-        slow_type("Enter number to select.")
-        N = len(player.items)
-        for j in range(0, N):
-            print(j+1,')',items[j].name)
-        print(N+1,') Cancel')
-        try:
-            choice = int(input("> "))
-        except:
-            slow_type("Enter a number!")
-            continue
-        if choice <= N and choice >= 1:
-            slow_type("Use {}? (y/n)".format(items[choice-1].name))
-            confirmation = input("> ")
-            if confirmation in ["yes", "YES", "y", "Y"]:
-                confirmed = True
-                return items[choice-1]
-            else:
-                print("Cancelling item selection")
-                choice = N+1
-                npause()
-                return -1
-        elif choice == N+1:
-            print("Cancelled item selection...")
-            npause()
-            return -1
-        else:
-            continue
 
 def check_dead(character):
     if not character.status:
@@ -336,7 +431,7 @@ def initiate_combat(player, foe):
 
         # execute combat options
         if choice == "item":
-            item = choose_item(player)
+            item = selector(player.items, "{} has no items!".format(player.name))
             if item == 0: # there are no items!
                 continue
             elif item == -1: # item selection was cancelled...
@@ -378,7 +473,7 @@ def initiate_combat(player, foe):
         attack(foe, player)
         if player.status == 0:
             print("{} has been defeated by {}.".format(player.name, foe.name))
-            spause()
+            npause()
             game_over()
 
         both_alive = foe.status and player.status
@@ -391,3 +486,52 @@ def post_combat(player, foe, result):
         loot_corpse(player, foe)
         if foe.events != []:
             foe.trigger_post_event() 
+
+#####################################################################
+
+
+def selector(objects, message_if_empty, prompt_confirm = True):
+    """
+    Print out a select dialog and output the desired object selected.
+    Objects are required to have .name attribute
+
+    Outputs:
+        object: the object chosen
+        0: if there are no objects to select
+        -1: if object selection is cancelled
+    """
+    confirmed = False
+    if objects == []:
+        # if there are no objects, cancel and print out message
+        slow_type(message_if_empty)
+        npause()
+        return 0
+        exit
+        
+    while not confirmed:
+        slow_type("Enter number to select.")
+        N = len(objects)
+        for j in range(0, N):
+            print(j+1,')',objects[j].name)
+        print(N+1,') Cancel')
+        try:
+            choice = int(input("> "))
+        except:
+            slow_type("Enter a number!")
+            continue
+        if choice == N+1:
+            print("Cancelling selection")
+            npause()
+            return -1
+        elif choice <= N and choice >= 1:
+            if prompt_confirm:
+                slow_type("Select {}? (y/n)".format(objects[choice-1].name))
+                confirmation = input("> ")
+                if confirmation in ["yes", "YES", "y", "Y"]:
+                    confirmed = True
+                    return objects[choice-1]
+            else:
+                confirmed = True
+                return objects[choice-1]
+        else:
+            continue
