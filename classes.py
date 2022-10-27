@@ -149,7 +149,7 @@ class Item:
             slow_type(self.name+': '+self.description)
             slow_type("{} used {}!".format(player.name, self.name))
             self.function(player,foe)
-            check_uses_and_use(self, player)
+            self.check_uses_and_use(player)
 
     def check_uses_and_use(self, player):
         if self.uses >= 1:
@@ -244,7 +244,9 @@ class Room(object):
             slow_type("{} is suddenly attacked!".format(player.name))
             result_last_combat = initiate_combat(player, monster)
             post_combat(player, monster, result_last_combat)
+            cls()
             self.monsters = monsters
+            self.room_header()
         slow_type(self.description)
         npause()
         if self.chests != []:
