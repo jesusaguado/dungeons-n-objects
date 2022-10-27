@@ -1,5 +1,6 @@
 from sys import exit
 import random
+from classes import *
 
 spaces ="                  "
 
@@ -65,3 +66,5 @@ gameovertext="""
  ╚█████╔╝░░╚██╔╝░░███████╗██║░░██║
  ░╚════╝░░░░╚═╝░░░╚══════╝╚═╝░░╚═╝
 """
+
+

@@ -90,6 +90,14 @@ class Character:
             self.events = []
         if items == None:
             self.items = []
+    def delete_item(self, item):
+        items = self.items
+        new_items = []
+        for cycle_item in items:
+            if cycle_item != item:
+                new_items.append(cycle_item)
+        self.items = new_items
+
 
     def print_status(self):
          
@@ -122,10 +130,47 @@ class Character:
                 event.trigger()
 
 class Item:
-    def __init__(self, name, function, description = ""):
+    def __init__(self, name, function, usage, uses, description = ""):
         self.name = name
         self.function = function
         self.description = description
+        # an integer that stores how many uses it has. -1 for infinity
+        self.uses = uses
+        # usage can be: anywhere or in combat or in map. If it can be
+        # used in map, self.function should NOT depend on anything than
+        # the player!
+        self.usage = usage
+
+    def combat_use(self, player, foe):
+        if self.usage not in ["combat","anywhere"]:
+            slow_type("{} cannot be used in combat!".self.name)
+            return -1
+        else:
+            slow_type(self.name+': '+self.description)
+            slow_type("{} used {}!".format(player.name, self.name))
+            self.function(player,foe)
+            check_uses_and_use(self, player)
+
+    def check_uses_and_use(self, player):
+        if self.uses >= 1:
+            self.uses -= 1
+
+        if self.uses == 0:
+            slow_type("{} was used up...".format(self.name))
+            player.delete_item(self)
+        elif self.uses >=0:
+            slow_type("{Can still use {} {} more time(s)".format(self.name, self.uses))
+
+
+    def map_use(self, player):
+        if self.usage not in ["map", "anywhere"]:
+            slow_type("{} cannot be used here".self.name)
+            return -1
+        else:
+            slow_type("{} used {}!".format(player.name, self.name))
+            self.function(player)
+            self.check_uses_and_use(player)
+
     
 
 
@@ -196,12 +241,15 @@ class Room(object):
         random.shuffle(monsters)
         while monsters != []:
             monster = monsters.pop()
-            slow_type("{} is suddenly attack!".format(player.name))
+            slow_type("{} is suddenly attacked!".format(player.name))
             result_last_combat = initiate_combat(player, monster)
             post_combat(player, monster, result_last_combat)
             self.monsters = monsters
         slow_type(self.description)
         npause()
+        if self.chests != []:
+            slow_type("(!) There might be some loot around.")
+            npause()
         exited = give_room_options(player, self, gamemap)
         
 
@@ -289,12 +337,15 @@ def start_game():
 def end_game():
     cls()
     print(end)
-    slow_type(spaces+"Play again? (y/n)")
-    choice = input("> ")
-    if choice in yeses:
-        start_game()
-    else:
-        exit()
+    npause()
+    # Not yet implemented
+    #slow_type(spaces+"Play again? (y/n)")
+    #choice = input("> ")
+    #if choice in yeses:
+    #    start_game()
+    #else:
+    #    exit()
+    exit()
 
 def game_over():
     cls()
@@ -338,6 +389,11 @@ def give_room_options(player, room, gamemap):
             item = selector(player.items, "{} has no items!".format(player.name), False)
             if item not in [0,-1]:
                 slow_type(item.name+': '+item.description)
+                if item.usage in ["anywhere", "map"]:
+                    slow_type("Want to use {}? (y/n)".format(item.name))
+                    choice = input("> ")
+                    if choice in yeses:
+                        result = item.map_use(player)
                 npause()
 
         elif choice in ['room', 'ROOM']:
@@ -437,7 +493,8 @@ def initiate_combat(player, foe):
             elif item == -1: # item selection was cancelled...
                 continue
             else:
-                use_item(player, foe, item)
+                #use_item(player, foe, item)
+                item.combat_use(player, foe)
                 if check_dead(foe):
                     slow_type("{} wins!".format(player.name))
                     Npause()
@@ -460,7 +517,7 @@ def initiate_combat(player, foe):
             slow_type("{} sings {} the song of his people!".format(player.name, foe.name))
             slow_type("{} is now friends with {}. No need to combat anymore!".format(player.name, foe.name))
             spause()
-            return 2
+            return 1
 
         # not valid user input for combat option
         else:
