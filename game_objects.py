@@ -22,7 +22,7 @@ golem.attach_event(event_end_game)
 ##################################################
 
 def potion_fun(power):
-    def concrete_potion(user):
+    def concrete_potion(user, foe = None):
         hp = user.hp
         max_hp = user.max_hp
         delta = max_hp - hp

@@ -360,6 +360,7 @@ class Room(object):
 
             monster = monsters.pop()
             slow_type("{} is suddenly attacked!".format(player.name))
+            npause()
             result_last_combat = initiate_combat(player, monster)
             post_combat(player, monster, result_last_combat)
             cls()
@@ -613,6 +614,7 @@ def give_room_options(player, room, gamemap):
             if exit_room not in [0,-1]:
                 exiting_room = True
                 slow_type("Moving towards {}...".format(exit_room.name.format()))
+                npause()
 
         elif choice in ['loot','LOOT','chest','CHEST','chests','CHESTS']:
             slow_type("You look around for anything of value...")
@@ -686,7 +688,7 @@ def initiate_combat(player, foe):
     """
 
     # Introduce the combat
-    slow_type("{} encounters a {}!".format(player.name, foe.name))
+    slow_type("{} battles {}!".format(player.name, foe.name))
     npause()
 
     both_alive = player.status and foe.status
